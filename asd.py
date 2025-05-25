@@ -2,6 +2,8 @@ from flask import Flask, request, jsonify
 from flask_cors import CORS, cross_origin
 import pandas as pd
 from joblib import load
+from category_encoders import BinaryEncoder
+
 
 model = load("decision_tree_model.joblib")
 x = pd.read_csv("dataset.csv")
