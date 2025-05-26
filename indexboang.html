@@ -169,77 +169,76 @@
     <div id="result" class="mt-4 text-center"></div>
   </div>
 
-  <script>
+ <script>
+  document.getElementById('predictionForm').addEventListener('submit', async function (e) {
+    e.preventDefault();
 
-       document.getElementById('predictionForm').addEventListener('submit', async function (e) {
-      e.preventDefault();
+    const inputData = {
+      "Age": parseFloat(document.getElementById('age').value),
+      "Tumor Size (cm)": parseFloat(document.getElementById('tumorSize').value),
+      "Cost of Treatment (USD)": 0,
+      "Economic Burden (Lost Workdays per Year)": 0,
+      "Country": "Philippines",
+      "Gender": document.getElementById('gender').value,
+      "Tobacco Use": document.getElementById('tobaccoUse').value,
+      "Alcohol Consumption": document.getElementById('alcoholConsumption').value,
+      "HPV Infection": document.getElementById('hpvInfection').value,
+      "Betel Quid Use": document.getElementById('betelQuidUse').value,
+      "Chronic Sun Exposure": document.getElementById('sunExposure').value,
+      "Poor Oral Hygiene": document.getElementById('oralHygiene').value,
+      "Diet (Fruits & Vegetables Intake)": document.getElementById('diet').value,
+      "Family History of Cancer": document.getElementById('familyHistory').value,
+      "Compromised Immune System": document.getElementById('immuneSystem').value,
+      "Oral Lesions": document.getElementById('oralLesions').value,
+      "Unexplained Bleeding": document.getElementById('bleeding').value,
+      "Difficulty Swallowing": document.getElementById('swallowing').value,
+      "White or Red Patches in Mouth": document.getElementById('patches').value,
+      "Treatment Type": document.getElementById('treatmentType').value,
+      "Early Diagnosis": document.getElementById('earlyDiagnosis').value
+    };
 
-      const inputData = {
-        "Age": parseFloat(document.getElementById('age').value),
-        "Tumor Size (cm)": parseFloat(document.getElementById('tumorSize').value),
-        "Cost of Treatment (USD)": 0,
-        "Economic Burden (Lost Workdays per Year)": 0,
-        "Country": "Philippines",
-        "Gender": document.getElementById('gender').value,
-        "Tobacco Use": "Yes",
-        "Alcohol Consumption": "No",
-        "HPV Infection": "No",
-        "Betel Quid Use": "No",
-        "Chronic Sun Exposure": "No",
-        "Poor Oral Hygiene": "Yes",
-        "Diet (Fruits & Vegetables Intake)": "Low",
-        "Family History of Cancer": "No",
-        "Compromised Immune System": "No",
-        "Oral Lesions": "Yes",
-        "Unexplained Bleeding": "No",
-        "Difficulty Swallowing": "No",
-        "White or Red Patches in Mouth": "Yes",
-        "Treatment Type": "Surgery",
-        "Early Diagnosis": "Yes"
-      };
+    const requestData = { inputs: [inputData] };
 
-      const requestData = { inputs: [inputData] };
+    try {
+      const response = await fetch('https://test-gwapo-flask.onrender.com/predict', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(requestData)
+      });
 
-      try {
-        const response = await fetch('https://test-gwapo-flask.onrender.com/predict', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(requestData)
-        });
+      const result = await response.json();
+      console.log("Response:", result);
 
-        const result = await response.json();
-        console.log("Response:", result);
-
-        if (!response.ok || !result.prediction_probabilities) {
-          throw new Error(result.error || 'Invalid response from server.');
-        }
-
-        const probs = result.prediction_probabilities;
-        const predictedClass = probs[1] > probs[0] ? "Yes" : "No";
-
-        const riskDetails = `0: ${(probs[0] * 100).toFixed(2)}%\n1: ${(probs[1] * 100).toFixed(2)}%`;
-
-        const fullResult = `
-          <h4 class="alert-heading">Prediction Result</h4>
-          <p><strong>Prediction:</strong> ${predictedClass}</p>
-          <pre><strong>Risk Breakdown:</strong>\n${riskDetails}</pre>
-        `;
-
-        document.getElementById('result').innerHTML = `
-          <div class="alert alert-info text-start" role="alert">
-            ${fullResult}
-          </div>
-        `;
-      } catch (error) {
-        console.error('Error:', error);
-        document.getElementById('result').innerHTML = `
-          <div class="alert alert-danger" role="alert">
-            An error occurred: ${error.message}
-          </div>
-        `;
+      if (!response.ok || !result.prediction_probabilities) {
+        throw new Error(result.error || 'Invalid response from server.');
       }
-    });
 
-  </script>
+      const probs = result.prediction_probabilities;
+      const predictedClass = probs[1] > probs[0] ? "Yes" : "No";
+
+      const riskDetails = `0: ${(probs[0] * 100).toFixed(2)}%\n1: ${(probs[1] * 100).toFixed(2)}%`;
+
+      const fullResult = `
+        <h4 class="alert-heading">Prediction Result</h4>
+        <p><strong>Prediction:</strong> ${predictedClass}</p>
+        <pre><strong>Risk Breakdown:</strong>\n${riskDetails}</pre>
+      `;
+
+      document.getElementById('result').innerHTML = `
+        <div class="alert alert-info text-start" role="alert">
+          ${fullResult}
+        </div>
+      `;
+    } catch (error) {
+      console.error('Error:', error);
+      document.getElementById('result').innerHTML = `
+        <div class="alert alert-danger" role="alert">
+          An error occurred: ${error.message}
+        </div>
+      `;
+    }
+  });
+</script>
+
 </body>
 </html>
