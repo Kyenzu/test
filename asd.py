@@ -69,7 +69,6 @@ def predict_heart_failure():
 
         input_encoded = encoder.transform(input_df[categorical_features])
         input_df = input_df.drop(categorical_features, axis=1)
-        input_df['ID'] = 0  # optional
 
         input_encoded = input_encoded.reset_index(drop=True)
         input_df = input_df.reset_index(drop=True)
