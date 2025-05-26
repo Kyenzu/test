@@ -11,6 +11,7 @@ logging.basicConfig(level=logging.INFO)
 # Initialize Flask app
 api = Flask(__name__)
 
+# ✅ CORS setup: allow both HTTP and HTTPS versions of your InfinityFree frontend
 CORS(api, resources={r"/predict": {"origins": [
     "http://patalinijug.infinityfreeapp.com",
     "https://patalinijug.infinityfreeapp.com"
@@ -27,7 +28,7 @@ categorical_features = [
     'Difficulty Swallowing', 'White or Red Patches in Mouth', 'Treatment Type', 'Early Diagnosis'
 ]
 
-# Function to load the model and encoder lazily
+# Load model and encoder
 def load_model_and_encoder():
     global model, encoder
     if model is None:
@@ -43,46 +44,38 @@ def load_model_and_encoder():
         encoder = BinaryEncoder()
         encoder.fit(x[categorical_features])
 
-# Endpoint for prediction
+# Prediction endpoint
 @api.route('/predict', methods=['POST', 'OPTIONS'])
 def predict_heart_failure():
-    # Limit the request size to 10MB
-    max_data_size = 10 * 1024 * 1024  # Max 10MB
+    max_data_size = 10 * 1024 * 1024  # 10MB limit
     if request.content_length and request.content_length > max_data_size:
         abort(413, description="Payload too large")
 
     if request.method == 'OPTIONS':
-        # Preflight request
-        return '', 200
+        # This is critical to respond to CORS preflight request
+        response = api.make_default_options_response()
+        response.headers['Access-Control-Allow-Origin'] = request.headers.get('Origin')
+        response.headers['Access-Control-Allow-Methods'] = 'POST, OPTIONS'
+        response.headers['Access-Control-Allow-Headers'] = 'Content-Type'
+        return response
 
     try:
-        # Load model and encoder
         load_model_and_encoder()
 
-        data = request.json.get('inputs')
-        if not data:
-            raise ValueError("No input data received")
-
+        data = request.json['inputs']
         logging.info(f"Data received: {data}")
 
-        # Convert input data to DataFrame
         input_df = pd.DataFrame(data)
 
-        # Encode categorical features
         input_encoded = encoder.transform(input_df[categorical_features])
-
-        # Drop original categorical features
         input_df = input_df.drop(categorical_features, axis=1)
+        input_df['ID'] = 0  # optional
 
- 
-        # Align indices
-        input_df = input_df.reset_index(drop=True)
         input_encoded = input_encoded.reset_index(drop=True)
+        input_df = input_df.reset_index(drop=True)
 
-        # Combine input and encoded data
         final_input = pd.concat([input_df, input_encoded], axis=1)
 
-        # Predict
         prediction_probs = model.predict_proba(final_input)[0]
         logging.info(f"Prediction probabilities: {prediction_probs}")
 
@@ -92,5 +85,6 @@ def predict_heart_failure():
         logging.error(f"Error: {str(e)}")
         return jsonify({"error": str(e)}), 400
 
+# Start server
 if __name__ == "__main__":
-    api.run(debug=True, host='0.0.0.0', port=5000)
+    api.run(debug=True, host="0.0.0.0", port=5000)
