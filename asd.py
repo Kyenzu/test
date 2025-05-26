@@ -1,5 +1,5 @@
 from flask import Flask, request, jsonify, abort
-from flask_cors import CORS, cross_origin
+from flask_cors import CORS
 import pandas as pd
 from joblib import load
 import logging
@@ -10,20 +10,22 @@ logging.basicConfig(level=logging.INFO)
 
 # Initialize Flask app
 api = Flask(__name__)
-CORS(api)
+
+# Allow CORS only from your frontend domain
+CORS(api, resources={r"/predict": {"origins": "https://patalinijug.infinityfreeapp.com"}})
 
 # Global variables
 encoder = None
 model = None
 categorical_features = [
-    'Age', 'Tumor Size (cm)', 'Cost of Treatment (USD)',
+    'Age', 'Tumor Size (cm)', 'Cost of Treatment (USD)', 
     'Economic Burden (Lost Workdays per Year)', 'Country', 'Gender', 'Tobacco Use', 'Alcohol Consumption',
-    'HPV Infection', 'Betel Quid Use', 'Chronic Sun Exposure', 'Poor Oral Hygiene',
-    'Diet (Fruits & Vegetables Intake)', 'Family History of Cancer', 'Compromised Immune System',
-    'Oral Lesions', 'Unexplained Bleeding', 'Difficulty Swallowing',
-    'White or Red Patches in Mouth', 'Treatment Type', 'Early Diagnosis'
+    'HPV Infection', 'Betel Quid Use', 'Chronic Sun Exposure', 'Poor Oral Hygiene', 'Diet (Fruits & Vegetables Intake)',
+    'Family History of Cancer', 'Compromised Immune System', 'Oral Lesions', 'Unexplained Bleeding', 
+    'Difficulty Swallowing', 'White or Red Patches in Mouth', 'Treatment Type', 'Early Diagnosis'
 ]
 
+# Function to load the model and encoder lazily
 def load_model_and_encoder():
     global model, encoder
     if model is None:
@@ -31,28 +33,54 @@ def load_model_and_encoder():
         model = load("decision_tree_model.joblib")
     if encoder is None:
         logging.info("Loading encoder...")
-        x = pd.read_csv("dataset.csv", dtype={'Age': 'int32', 'Tumor Size (cm)': 'float32', 'Cost of Treatment (USD)': 'float32'})
+        x = pd.read_csv("dataset.csv", dtype={
+            'Age': 'int32',
+            'Tumor Size (cm)': 'float32',
+            'Cost of Treatment (USD)': 'float32'
+        })
         encoder = BinaryEncoder()
         encoder.fit(x[categorical_features])
 
+# Endpoint for prediction
 @api.route('/predict', methods=['POST', 'OPTIONS'])
-@cross_origin(origins='*')
-def predict():
+def predict_heart_failure():
+    # Limit the request size to 10MB
+    max_data_size = 10 * 1024 * 1024  # Max 10MB
+    if request.content_length and request.content_length > max_data_size:
+        abort(413, description="Payload too large")
+
     if request.method == 'OPTIONS':
+        # Preflight request
         return '', 200
 
     try:
+        # Load model and encoder
         load_model_and_encoder()
 
-        data = request.json['inputs']
+        data = request.json.get('inputs')
+        if not data:
+            raise ValueError("No input data received")
+
         logging.info(f"Data received: {data}")
+
+        # Convert input data to DataFrame
         input_df = pd.DataFrame(data)
 
+        # Encode categorical features
         input_encoded = encoder.transform(input_df[categorical_features])
-        input_df = input_df.drop(categorical_features, axis=1)
-        input_df['ID'] = 0
-        final_input = pd.concat([input_df.reset_index(drop=True), input_encoded.reset_index(drop=True)], axis=1)
 
+        # Drop original categorical features
+        input_df = input_df.drop(categorical_features, axis=1)
+
+
+        # Align indices
+        input_df = input_df.reset_index(drop=True)
+        input_encoded = input_encoded.reset_index(drop=True)
+
+        # Combine input and encoded data
+        final_input = pd.concat([input_df, input_encoded], axis=1)
+
+        # Predict
         prediction_probs = model.predict_proba(final_input)[0]
         logging.info(f"Prediction probabilities: {prediction_probs}")
 
