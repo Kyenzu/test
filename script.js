@@ -30,7 +30,7 @@
 
         try {
             // Sending request to the backend API
-            const response = await fetch('https://test-gwapo-flask.onrender.com/hfp_prediction', {
+            const response = await fetch('https://test-gwapo-flask.onrender.com/predict', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(requestData)
