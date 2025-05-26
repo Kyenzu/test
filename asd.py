@@ -57,29 +57,8 @@ def predict_heart_failure():
         # Make the prediction using the trained model
         prediction_probs = model.predict_proba(final_input)[0]
 
-        # Define risk categories and their suggestions
-        risk_levels = {
-            "No Risk": prediction_probs[0] * 100,
-            "Moderate Risk": prediction_probs[1] * 100,
-            "High Risk": prediction_probs[2] * 100
-        }
-
-        # Determine the highest risk category
-        predicted_class = max(risk_levels, key=risk_levels.get)
-
-        # Suggestions based on the predicted class
-        suggestions = {
-            "No Risk": "You currently show no signs of heart failure risk. Maintain a balanced lifestyle and regular health check-ups.",
-            "Moderate Risk": "There are moderate indicators of heart failure. Consider scheduling a heart function test.",
-            "High Risk": "There is a high risk of heart failure. Please consult a healthcare provider immediately for a full diagnosis."
-        }
-
-        # Construct a response with risk breakdown and suggestion
-        response = {
-            "prediction": predicted_class,
-            "risk_percentages": risk_levels,
-            "suggestion": suggestions[predicted_class]
-        }
+        # Construct a response with just the raw probabilities
+        response = {"prediction_probabilities": prediction_probs.tolist()}
 
         return jsonify(response)
 
