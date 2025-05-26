@@ -4,10 +4,13 @@ import pandas as pd
 from joblib import load
 from category_encoders import BinaryEncoder
 
-
+# Load the trained model
 model = load("decision_tree_model.joblib")
+
+# Load dataset (ensure this is correctly preprocessed, if needed)
 x = pd.read_csv("dataset.csv")
 
+# Define categorical features for encoding
 categorical_features = [
     'Age', 'Tumor Size (cm)', 'Cost of Treatment (USD)', 
     'Economic Burden (Lost Workdays per Year)', 'Country', 'Gender', 'Tobacco Use', 'Alcohol Consumption',
@@ -16,45 +19,73 @@ categorical_features = [
     'Difficulty Swallowing', 'White or Red Patches in Mouth', 'Treatment Type', 'Early Diagnosis'
 ]
 
+# Initialize encoder and fit it on the categorical features
 encoder = BinaryEncoder()
-encoder.fit_transform(x[categorical_features])
+encoder.fit(x[categorical_features])
 
+# Initialize Flask app
 api = Flask(__name__)
-CORS(api)
+CORS(api)  # Enable CORS globally
 
-@api.route('/api/hfp_prediction', methods=['POST'])
+@api.route('/predict', methods=['POST', 'OPTIONS'])
+@cross_origin(origins='*')  # Allow requests from all origins
 def predict_heart_failure():
-    data = request.json['inputs']
-    input_df = pd.DataFrame(data)
-    
-    # Encoding categorical features
-    input_encoded = encoder.transform(input_df[categorical_features])
-    
-    # Dropping categorical features from the original input DataFrame
-    input_df = input_df.drop(categorical_features, axis=1)
-    
-    # Adding 'ID' as a column in the DataFrame
-    input_df['ID'] = 0  # You can change this as needed (e.g., unique ID per input)
+    if request.method == 'OPTIONS':
+        # Handle preflight request (for CORS)
+        return '', 200
 
-    # Resetting the index
-    input_encoded = input_encoded.reset_index(drop=True)
-    input_df = input_df.reset_index(drop=True)
-    
-    # Concatenating the ID and encoded features
-    final_input = pd.concat([input_df, input_encoded], axis=1)
+    try:
+        data = request.json['inputs']
+        input_df = pd.DataFrame(data)
 
-    # Making the prediction
-    prediction = model.predict_proba(final_input)
-    class_labels = model.classes_
+        # Encode categorical features
+        input_encoded = encoder.transform(input_df[categorical_features])
 
-    response = []
-    for prob in prediction:
-        prob_dict = {}
-        for k, v in zip(class_labels, prob):
-            prob_dict[str(k)] = round(float(v) * 100, 2)
-        response.append(prob_dict)
+        # Drop categorical features from the original input DataFrame
+        input_df = input_df.drop(categorical_features, axis=1)
 
-    return jsonify({'prediction': response})
+        # Add 'ID' column (you can customize this as needed)
+        input_df['ID'] = 0  # Can be adjusted based on your input format
+
+        # Reset the index to ensure proper concatenation
+        input_encoded = input_encoded.reset_index(drop=True)
+        input_df = input_df.reset_index(drop=True)
+
+        # Concatenate encoded features and input_df (including 'ID')
+        final_input = pd.concat([input_df, input_encoded], axis=1)
+
+        # Make the prediction using the trained model
+        prediction_probs = model.predict_proba(final_input)[0]
+
+        # Define risk categories and their suggestions
+        risk_levels = {
+            "No Risk": prediction_probs[0] * 100,
+            "Moderate Risk": prediction_probs[1] * 100,
+            "High Risk": prediction_probs[2] * 100
+        }
+
+        # Determine the highest risk category
+        predicted_class = max(risk_levels, key=risk_levels.get)
+
+        # Suggestions based on the predicted class
+        suggestions = {
+            "No Risk": "You currently show no signs of heart failure risk. Maintain a balanced lifestyle and regular health check-ups.",
+            "Moderate Risk": "There are moderate indicators of heart failure. Consider scheduling a heart function test.",
+            "High Risk": "There is a high risk of heart failure. Please consult a healthcare provider immediately for a full diagnosis."
+        }
+
+        # Construct a response with risk breakdown and suggestion
+        response = {
+            "prediction": predicted_class,
+            "risk_percentages": risk_levels,
+            "suggestion": suggestions[predicted_class]
+        }
+
+        return jsonify(response)
+
+    except Exception as e:
+        # Return error response in case of any failure
+        return jsonify({"error": str(e)}), 400
 
 if __name__ == "__main__":
     api.run(debug=True, host='0.0.0.0', port=5000)
