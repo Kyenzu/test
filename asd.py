@@ -1,16 +1,20 @@
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, abort
 from flask_cors import CORS, cross_origin
 import pandas as pd
 from joblib import load
+import logging
 from category_encoders import BinaryEncoder
 
-# Load the trained model
-model = load("decision_tree_model.joblib")
+# Set up logging
+logging.basicConfig(level=logging.INFO)
 
-# Load dataset (ensure this is correctly preprocessed, if needed)
-x = pd.read_csv("dataset.csv")
+# Initialize Flask app
+api = Flask(__name__)
+CORS(api)  # Enable CORS globally
 
-# Define categorical features for encoding
+# Global variables
+encoder = None
+model = None
 categorical_features = [
     'Age', 'Tumor Size (cm)', 'Cost of Treatment (USD)', 
     'Economic Burden (Lost Workdays per Year)', 'Country', 'Gender', 'Tobacco Use', 'Alcohol Consumption',
@@ -19,23 +23,39 @@ categorical_features = [
     'Difficulty Swallowing', 'White or Red Patches in Mouth', 'Treatment Type', 'Early Diagnosis'
 ]
 
-# Initialize encoder and fit it on the categorical features
-encoder = BinaryEncoder()
-encoder.fit(x[categorical_features])
+# Function to load the model and encoder lazily
+def load_model_and_encoder():
+    global model, encoder
+    if model is None:
+        logging.info("Loading model...")
+        model = load("decision_tree_model.joblib")
+    if encoder is None:
+        logging.info("Loading encoder...")
+        x = pd.read_csv("dataset.csv", dtype={'Age': 'int32', 'Tumor Size (cm)': 'float32', 'Cost of Treatment (USD)': 'float32'})
+        encoder = BinaryEncoder()
+        encoder.fit(x[categorical_features])
 
-# Initialize Flask app
-api = Flask(__name__)
-CORS(api)  # Enable CORS globally
-
+# Endpoint for heart failure prediction
 @api.route('/hfp_prediction', methods=['POST', 'OPTIONS'])
-@cross_origin(origins='*')  # Allow requests from all origins
+@cross_origin(origins='*')
 def predict_heart_failure():
+    # Limit the request size to 10MB
+    max_data_size = 10 * 1024 * 1024  # Max data size 10MB
+    if request.content_length > max_data_size:
+        abort(413, description="Payload too large")
+
     if request.method == 'OPTIONS':
         # Handle preflight request (for CORS)
         return '', 200
 
     try:
+        # Load the model and encoder if they are not already loaded
+        load_model_and_encoder()
+
         data = request.json['inputs']
+        logging.info(f"Data received: {data}")
+
+        # Convert input data to a DataFrame
         input_df = pd.DataFrame(data)
 
         # Encode categorical features
@@ -57,14 +77,18 @@ def predict_heart_failure():
         # Make the prediction using the trained model
         prediction_probs = model.predict_proba(final_input)[0]
 
+        # Log the probabilities
+        logging.info(f"Prediction probabilities: {prediction_probs}")
+
         # Construct a response with just the raw probabilities
         response = {"prediction_probabilities": prediction_probs.tolist()}
 
         return jsonify(response)
 
     except Exception as e:
-        # Return error response in case of any failure
+        logging.error(f"Error: {str(e)}")
         return jsonify({"error": str(e)}), 400
 
 if __name__ == "__main__":
+    # Run the app with more robust configurations in production
     api.run(debug=True, host='0.0.0.0', port=5000)
