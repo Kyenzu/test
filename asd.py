@@ -36,7 +36,7 @@ def load_model_and_encoder():
         encoder.fit(x[categorical_features])
 
 # Endpoint for heart failure prediction
-@api.route('/hfp_prediction', methods=['POST', 'OPTIONS'])
+@api.route('/predict', methods=['POST', 'OPTIONS'])
 @cross_origin(origins='*')
 def predict_heart_failure():
     # Limit the request size to 10MB
