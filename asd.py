@@ -11,7 +11,7 @@ logging.basicConfig(level=logging.INFO)
 # Initialize Flask app
 api = Flask(__name__)
 
-# ✅ CORS setup: allow both HTTP and HTTPS versions of your InfinityFree frontend
+# ✅ Allow specific frontend origins
 CORS(api, resources={r"/predict": {"origins": [
     "http://patalinijug.infinityfreeapp.com",
     "https://patalinijug.infinityfreeapp.com"
@@ -20,6 +20,7 @@ CORS(api, resources={r"/predict": {"origins": [
 # Global variables
 encoder = None
 model = None
+
 categorical_features = [
     'Age', 'Tumor Size (cm)', 'Cost of Treatment (USD)', 
     'Economic Burden (Lost Workdays per Year)', 'Country', 'Gender', 'Tobacco Use', 'Alcohol Consumption',
@@ -52,7 +53,7 @@ def predict_heart_failure():
         abort(413, description="Payload too large")
 
     if request.method == 'OPTIONS':
-        # This is critical to respond to CORS preflight request
+        # ⚠️ Required for CORS preflight
         response = api.make_default_options_response()
         response.headers['Access-Control-Allow-Origin'] = request.headers.get('Origin')
         response.headers['Access-Control-Allow-Methods'] = 'POST, OPTIONS'
@@ -67,9 +68,14 @@ def predict_heart_failure():
 
         input_df = pd.DataFrame(data)
 
+        # Encode categorical features
         input_encoded = encoder.transform(input_df[categorical_features])
-        input_df = input_df.drop(categorical_features, axis=1)
 
+        # Drop categorical and add back 'ID' column to match model input
+        input_df = input_df.drop(categorical_features, axis=1)
+        input_df['ID'] = 0  # ✅ Required by model
+
+        # Reset index before concatenation
         input_encoded = input_encoded.reset_index(drop=True)
         input_df = input_df.reset_index(drop=True)
 
@@ -84,6 +90,6 @@ def predict_heart_failure():
         logging.error(f"Error: {str(e)}")
         return jsonify({"error": str(e)}), 400
 
-# Start server
+# Run the app
 if __name__ == "__main__":
     api.run(debug=True, host="0.0.0.0", port=5000)
