@@ -1,5 +1,5 @@
 from flask import Flask, request, jsonify, abort
-from flask_cors import CORS, cross_origin
+from flask_cors import CORS
 import pandas as pd
 from joblib import load
 import logging
@@ -10,7 +10,7 @@ logging.basicConfig(level=logging.INFO)
 
 # Initialize Flask app
 api = Flask(__name__)
-CORS(api)  # Enable CORS globally
+CORS(api, resources={r"/*": {"origins": "*"}}, supports_credentials=True)
 
 # Global variables
 encoder = None
@@ -35,18 +35,13 @@ def load_model_and_encoder():
         encoder = BinaryEncoder()
         encoder.fit(x[categorical_features])
 
-# Endpoint for heart failure prediction
-@api.route('/predict', methods=['POST', 'OPTIONS'])
-@cross_origin(origins='*')
-def predict_heart_failure():
+# Endpoint for prediction
+@api.route('/predict', methods=['POST'])
+def predict():
     # Limit the request size to 10MB
     max_data_size = 10 * 1024 * 1024  # Max data size 10MB
     if request.content_length > max_data_size:
         abort(413, description="Payload too large")
-
-    if request.method == 'OPTIONS':
-        # Handle preflight request (for CORS)
-        return '', 200
 
     try:
         # Load the model and encoder if they are not already loaded
