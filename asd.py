@@ -27,7 +27,7 @@ encoder.fit(x[categorical_features])
 api = Flask(__name__)
 CORS(api)  # Enable CORS globally
 
-@api.route('/predict', methods=['POST', 'OPTIONS'])
+@api.route('/hfp_prediction', methods=['POST', 'OPTIONS'])
 @cross_origin(origins='*')  # Allow requests from all origins
 def predict_heart_failure():
     if request.method == 'OPTIONS':
