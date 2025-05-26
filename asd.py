@@ -11,8 +11,10 @@ logging.basicConfig(level=logging.INFO)
 # Initialize Flask app
 api = Flask(__name__)
 
-# Allow CORS only from your frontend domain
-CORS(api, resources={r"/predict": {"origins": "https://patalinijug.infinityfreeapp.com"}})
+CORS(api, resources={r"/predict": {"origins": [
+    "http://patalinijug.infinityfreeapp.com",
+    "https://patalinijug.infinityfreeapp.com"
+]}}, supports_credentials=True)
 
 # Global variables
 encoder = None
@@ -72,7 +74,7 @@ def predict_heart_failure():
         # Drop original categorical features
         input_df = input_df.drop(categorical_features, axis=1)
 
-
+ 
         # Align indices
         input_df = input_df.reset_index(drop=True)
         input_encoded = input_encoded.reset_index(drop=True)
